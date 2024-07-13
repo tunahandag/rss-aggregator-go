@@ -2,10 +2,10 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/cors"
@@ -19,18 +19,15 @@ type apiConfig struct {
 }
 
 func main() {
-	
 	godotenv.Load(".env")
 
 	portString := os.Getenv("PORT")
-	
 	if portString == "" {
 		log.Fatal("PORT must be set")
 	}
-	fmt.Println("PORT is set to: ", portString)
+
 
 	dbUrl := os.Getenv("DB_URL")
-	
 	if dbUrl == "" {
 		log.Fatal("DB_URL must be set")
 	}
@@ -40,10 +37,13 @@ func main() {
 		log.Fatal("sql.Open: ", err)
 	}
 	
+	db := database.New(conn)
 	apiCfg := apiConfig {
-		db: database.New(conn),
+		db: db,
 	}
 
+	// go routine to start scrapping
+	go startScrapping(db, 10, time.Minute)
 
 	router := chi.NewRouter()
 
@@ -67,6 +67,8 @@ func main() {
 
 	v1Router.Post("/feed_follows", apiCfg.middlewareAuth(apiCfg.handlerCreateFeedFollows))
 	v1Router.Get("/feed_follows", apiCfg.middlewareAuth(apiCfg.handlerGetFeedFollow))
+	v1Router.Delete("/feed_follows/{feedFollowID}", apiCfg.middlewareAuth(apiCfg.handlerDeleteFeedFollow))
+
 
 	router.Mount("/v1", v1Router)
 
