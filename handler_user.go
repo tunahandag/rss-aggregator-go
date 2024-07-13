@@ -12,7 +12,7 @@ import (
 
 func (apiCfg *apiConfig)handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
-		Name string `json:name`
+		Name string `json:"name"`
 	}
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
