@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
@@ -9,7 +10,13 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/go-chi/cors"
 	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
+	"github.com/tunahandag/rss-aggregator/internal/database"
 )
+
+type apiConfig struct {
+	db *database.Queries
+}
 
 func main() {
 	
@@ -21,6 +28,22 @@ func main() {
 		log.Fatal("PORT must be set")
 	}
 	fmt.Println("PORT is set to: ", portString)
+
+	dbUrl := os.Getenv("DB_URL")
+	
+	if dbUrl == "" {
+		log.Fatal("DB_URL must be set")
+	}
+
+	conn, err := sql.Open("postgres", dbUrl)
+	if err != nil {
+		log.Fatal("sql.Open: ", err)
+	}
+	
+	apiCfg := apiConfig {
+		db: database.New(conn),
+	}
+
 
 	router := chi.NewRouter()
 
@@ -37,7 +60,13 @@ func main() {
 
 	v1Router.Get("/healthz", handlerReadiness)
 	v1Router.Get("/err", handlerErr)
-	
+	v1Router.Post("/users", apiCfg.handleCreateUser)
+	v1Router.Get("/users", apiCfg.middlewareAuth(apiCfg.handlerGetUser))
+	v1Router.Post("/feeds", apiCfg.middlewareAuth(apiCfg.handlerCreateFeed))
+	v1Router.Get("/feeds", apiCfg.handlerGetFeeds)
+
+	v1Router.Post("/feed_follows", apiCfg.middlewareAuth(apiCfg.handlerCreateFeedFollows))
+	v1Router.Get("/feed_follows", apiCfg.middlewareAuth(apiCfg.handlerGetFeedFollow))
 
 	router.Mount("/v1", v1Router)
 
@@ -47,7 +76,7 @@ func main() {
 	}
 	log.Printf("Starting server on port %v", portString)
 	
-	err := srv.ListenAndServe()
+	err = srv.ListenAndServe()
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
